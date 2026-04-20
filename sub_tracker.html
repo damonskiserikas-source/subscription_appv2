@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>SubTracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F7F7F5;
+    --surface: #FFFFFF;
+    --border: #EBEBEB;
+    --text: #1A1A1A;
+    --muted: #888;
+    --accent: #4F46E5;
+    --accent-light: #EEF2FF;
+    --warn: #F59E0B;
+    --warn-light: #FFFBEB;
+    --danger: #EF4444;
+    --danger-light: #FEF2F2;
+    --success: #10B981;
+    --success-light: #ECFDF5;
+    --cancelled: #9CA3AF;
+    --cancelled-light: #F9FAFB;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    max-width: 390px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* SCREENS */
+  .screen { display: none; flex-direction: column; min-height: 100vh; padding-bottom: 80px; }
+  .screen.active { display: flex; }
+
+  /* HEADER */
+  .header {
+    padding: 52px 20px 16px;
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .header p { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .header-row { display: flex; align-items: center; justify-content: space-between; }
+  .back-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 15px; color: var(--accent); font-weight: 500;
+    display: flex; align-items: center; gap: 4px; padding: 0;
+  }
+  .back-btn svg { width: 18px; height: 18px; }
+
+  /* SUMMARY STRIP */
+  .summary-strip {
+    display: flex; gap: 10px; padding: 0 20px 16px;
+  }
+  .summary-card {
+    flex: 1; background: var(--surface); border-radius: var(--radius-sm);
+    padding: 12px 14px; border: 1px solid var(--border);
+  }
+  .summary-card .val { font-size: 20px; font-weight: 700; }
+  .summary-card .lbl { font-size: 11px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+  /* SUB LIST */
+  .sub-list { padding: 0 20px; display: flex; flex-direction: column; gap: 12px; }
+  .section-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+
+  .sub-card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 16px; border: 1px solid var(--border);
+    cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .sub-card:active { transform: scale(0.98); }
+  .sub-card.expiring { border-color: #FCD34D; background: var(--warn-light); }
+  .sub-card.expired { border-color: #FCA5A5; background: var(--danger-light); }
+  .sub-card.cancelled { opacity: 0.55; }
+
+  .sub-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .sub-info { flex: 1; min-width: 0; }
+  .sub-name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sub-price { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .sub-right { text-align: right; flex-shrink: 0; }
+  .days-badge {
+    font-size: 13px; font-weight: 700; padding: 4px 9px; border-radius: 20px;
+    display: inline-block;
+  }
+  .badge-active { background: var(--accent-light); color: var(--accent); }
+  .badge-expiring { background: #FEF3C7; color: #D97706; }
+  .badge-expired { background: var(--danger-light); color: var(--danger); }
+  .badge-cancelled { background: var(--cancelled-light); color: var(--cancelled); }
+  .sub-status { font-size: 11px; color: var(--muted); margin-top: 3px; text-align: right; }
+
+  /* EMPTY */
+  .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+  .empty .emoji { font-size: 40px; margin-bottom: 12px; }
+  .empty p { font-size: 15px; }
+
+  /* FAB */
+  .fab {
+    position: fixed; bottom: 24px; right: 20px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    border: none; cursor: pointer; font-size: 28px;
+    box-shadow: 0 4px 20px rgba(79,70,229,0.35);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s, box-shadow 0.15s;
+    z-index: 50;
+  }
+  .fab:active { transform: scale(0.93); box-shadow: 0 2px 10px rgba(79,70,229,0.25); }
+
+  /* DETAIL */
+  .detail-hero {
+    margin: 0 20px 20px;
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px 20px; border: 1px solid var(--border);
+    text-align: center;
+  }
+  .detail-icon {
+    width: 64px; height: 64px; border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; margin: 0 auto 12px; 
+  }
+  .detail-name { font-size: 22px; font-weight: 700; }
+  .detail-price { font-size: 16px; color: var(--muted); margin-top: 4px; }
+
+  .countdown-ring {
+    margin: 16px auto 0;
+    width: 100px; height: 100px; position: relative;
+  }
+  .countdown-ring svg { transform: rotate(-90deg); }
+  .countdown-ring .ring-bg { fill: none; stroke: var(--border); stroke-width: 6; }
+  .countdown-ring .ring-fill { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 0.5s; }
+  .countdown-label {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .countdown-label .num { font-size: 22px; font-weight: 800; }
+  .countdown-label .unit { font-size: 10px; color: var(--muted); display: block; }
+
+  .detail-rows { margin: 0 20px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .detail-row {
+    background: var(--surface); border-radius: var(--radius-sm);
+    border: 1px solid var(--border); padding: 14px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .detail-row .lbl { font-size: 14px; color: var(--muted); }
+  .detail-row .val { font-size: 14px; font-weight: 600; }
+
+  .action-btns { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+  .btn {
+    width: 100%; padding: 16px; border-radius: var(--radius-sm);
+    border: none; font-size: 16px; font-weight: 600; cursor: pointer;
+    transition: transform 0.12s, opacity 0.12s;
+  }
+  .btn:active { transform: scale(0.98); opacity: 0.85; }
+  .btn-renew { background: var(--accent); color: #fff; }
+  .btn-cancel { background: var(--danger-light); color: var(--danger); }
+  .btn-secondary { background: var(--border); color: var(--text); }
+
+  /* FORM */
+  .form-wrap { padding: 0 20px; display: flex; flex-direction: column; gap: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .field input, .field select {
+    width: 100%; padding: 14px 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 16px; color: var(--text);
+    outline: none; transition: border-color 0.15s;
+    appearance: none; -webkit-appearance: none;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+
+  .emoji-picker {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px;
+  }
+  .emoji-opt {
+    width: 42px; height: 42px; border-radius: 10px; border: 2px solid transparent;
+    background: var(--surface); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.1s, background 0.1s;
+  }
+  .emoji-opt.selected { border-color: var(--accent); background: var(--accent-light); }
+
+  .color-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .color-opt {
+    width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+    border: 3px solid transparent; transition: border-color 0.1s;
+  }
+  .color-opt.selected { border-color: var(--text); }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1A1A1A; color: #fff; padding: 10px 20px; border-radius: 24px;
+    font-size: 14px; font-weight: 500; opacity: 0; transition: opacity 0.2s, transform 0.2s;
+    z-index: 100; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* CANCELLED NOTICE */
+  .cancelled-notice {
+    margin: 0 20px 12px;
+    background: var(--cancelled-light); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 16px;
+    font-size: 14px; color: var(--cancelled); text-align: center;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 4px 20px; }
+</style>
+</head>
+<body>
+
+<!-- DASHBOARD -->
+<div class="screen active" id="screen-dashboard">
+  <div class="header">
+    <div class="header-row">
+      <div>
+        <h1>SubTracker</h1>
+        <p id="dash-subtitle">Your subscriptions</p>
+      </div>
+    </div>
+  </div>
+  <div class="summary-strip">
+    <div class="summary-card">
+      <div class="val" id="sum-monthly">$0</div>
+      <div class="lbl">Monthly</div>
+    </div>
+    <div class="summary-card">
+      <div class="val" id="sum-active">0</div>
+      <div class="lbl">Active</div>
+    </div>
+    <div class="summary-card">
+      <div class="val" id="sum-expiring">0</div>
+      <div class="lbl">Expiring</div>
+    </div>
+  </div>
+  <div class="sub-list" id="sub-list"></div>
+  <button class="fab" onclick="showAdd()">+</button>
+</div>
+
+<!-- DETAIL -->
+<div class="screen" id="screen-detail">
+  <div class="header">
+    <div class="header-row">
+      <button class="back-btn" onclick="showDash()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Back
+      </button>
+    </div>
+  </div>
+  <div class="detail-hero" id="detail-hero"></div>
+  <div class="detail-rows" id="detail-rows"></div>
+  <div id="cancelled-notice-wrap"></div>
+  <div class="action-btns" id="action-btns"></div>
+</div>
+
+<!-- ADD -->
+<div class="screen" id="screen-add">
+  <div class="header">
+    <div class="header-row">
+      <button class="back-btn" onclick="showDash()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Back
+      </button>
+      <h1 style="font-size:20px">Add Subscription</h1>
+      <div style="width:50px"></div>
+    </div>
+  </div>
+  <div class="form-wrap">
+    <div class="field">
+      <label>Service Name</label>
+      <input type="text" id="f-name" placeholder="e.g. Netflix" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label>Monthly Cost ($)</label>
+      <input type="number" id="f-price" placeholder="e.g. 15.99" step="0.01" min="0" />
+    </div>
+    <div class="field">
+      <label>Next Charge Date</label>
+      <input type="date" id="f-date" />
+    </div>
+    <div class="field">
+      <label>Icon</label>
+      <div class="emoji-picker" id="emoji-picker"></div>
+    </div>
+    <div class="field">
+      <label>Color</label>
+      <div class="color-picker" id="color-picker"></div>
+    </div>
+    <button class="btn btn-renew" onclick="addSub()">Add Subscription</button>
+    <div style="height:10px"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const EMOJIS = ['📺','🎵','☁️','🎮','📰','💼','🛡️','📚','🎨','🏋️','✉️','🔐','🌐','🎬','📦'];
+const COLORS = ['#4F46E5','#EC4899','#10B981','#F59E0B','#3B82F6','#8B5CF6','#EF4444','#14B8A6','#F97316','#6366F1'];
+
+let subs = [];
+let currentId = null;
+let selEmoji = EMOJIS[0];
+let selColor = COLORS[0];
+
+function loadSubs() {
+  const raw = localStorage.getItem('subtracker_subs');
+  if (raw) { subs = JSON.parse(raw); return; }
+  // Seed data
+  const today = new Date();
+  const d = (offset) => {
+    const dt = new Date(today);
+    dt.setDate(dt.getDate() + offset);
+    return dt.toISOString().split('T')[0];
+  };
+  subs = [
+    { id: uid(), name: 'Netflix', price: 15.99, nextDate: d(5),  emoji: '📺', color: '#EF4444', status: 'active' },
+    { id: uid(), name: 'Spotify', price: 9.99,  nextDate: d(23), emoji: '🎵', color: '#10B981', status: 'active' },
+    { id: uid(), name: 'Figma',   price: 12.00, nextDate: d(47), emoji: '🎨', color: '#F59E0B', status: 'active' },
+  ];
+  saveSubs();
+}
+
+function saveSubs() { localStorage.setItem('subtracker_subs', JSON.stringify(subs)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+function daysUntil(dateStr) {
+  const now = new Date(); now.setHours(0,0,0,0);
+  const d = new Date(dateStr); d.setHours(0,0,0,0);
+  return Math.round((d - now) / 86400000);
+}
+
+function getStatusClass(sub) {
+  if (sub.status === 'cancelled') return 'cancelled';
+  const days = daysUntil(sub.nextDate);
+  if (days < 0) return 'expired';
+  if (days <= 7) return 'expiring';
+  return 'active';
+}
+
+function getBadge(sub) {
+  const cls = getStatusClass(sub);
+  const days = daysUntil(sub.nextDate);
+  if (cls === 'cancelled') return { text: 'Cancelled', cls: 'badge-cancelled' };
+  if (cls === 'expired')   return { text: `${Math.abs(days)}d ago`, cls: 'badge-expired' };
+  if (cls === 'expiring')  return { text: days === 0 ? 'Today!' : `${days}d`, cls: 'badge-expiring' };
+  return { text: `${days}d`, cls: 'badge-active' };
+}
+
+function fmtDate(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// RENDER DASHBOARD
+function renderDash() {
+  const active = subs.filter(s => s.status !== 'cancelled');
+  const expiring = active.filter(s => { const d = daysUntil(s.nextDate); return d >= 0 && d <= 7; });
+  const monthly = active.reduce((sum, s) => sum + s.price, 0);
+  document.getElementById('sum-monthly').textContent = '$' + monthly.toFixed(2);
+  document.getElementById('sum-active').textContent = active.length;
+  document.getElementById('sum-expiring').textContent = expiring.length;
+  document.getElementById('dash-subtitle').textContent = `${subs.length} subscription${subs.length !== 1 ? 's' : ''}`;
+
+  const list = document.getElementById('sub-list');
+  list.innerHTML = '';
+
+  if (!subs.length) {
+    list.innerHTML = `<div class="empty"><div class="emoji">📭</div><p>No subscriptions yet.<br>Tap + to add your first.</p></div>`;
+    return;
+  }
+
+  // Sort: expiring first, then active, then cancelled
+  const order = { expiring: 0, expired: 1, active: 2, cancelled: 3 };
+  const sorted = [...subs].sort((a, b) => {
+    const oa = order[getStatusClass(a)], ob = order[getStatusClass(b)];
+    if (oa !== ob) return oa - ob;
+    return daysUntil(a.nextDate) - daysUntil(b.nextDate);
+  });
+
+  // Group expiring
+  const expiringItems = sorted.filter(s => getStatusClass(s) === 'expiring' || getStatusClass(s) === 'expired');
+  const otherItems = sorted.filter(s => getStatusClass(s) !== 'expiring' && getStatusClass(s) !== 'expired');
+
+  if (expiringItems.length) {
+    const lbl = document.createElement('div');
+    lbl.className = 'section-label';
+    lbl.textContent = '⚡ Needs attention';
+    list.appendChild(lbl);
+    expiringItems.forEach(s => list.appendChild(makeCard(s)));
+    if (otherItems.length) {
+      const d = document.createElement('div');
+      d.style.marginTop = '8px';
+      list.appendChild(d);
+      const lbl2 = document.createElement('div');
+      lbl2.className = 'section-label';
+      lbl2.textContent = 'All subscriptions';
+      list.appendChild(lbl2);
+    }
+  }
+  otherItems.forEach(s => list.appendChild(makeCard(s)));
+}
+
+function makeCard(sub) {
+  const badge = getBadge(sub);
+  const cls = getStatusClass(sub);
+  const div = document.createElement('div');
+  div.className = `sub-card ${cls}`;
+  div.onclick = () => showDetail(sub.id);
+  div.innerHTML = `
+    <div class="sub-icon" style="background:${sub.color}22">${sub.emoji}</div>
+    <div class="sub-info">
+      <div class="sub-name">${sub.name}</div>
+      <div class="sub-price">$${sub.price.toFixed(2)}/mo</div>
+    </div>
+    <div class="sub-right">
+      <span class="days-badge ${badge.cls}">${badge.text}</span>
+      <div class="sub-status">${cls === 'cancelled' ? 'Cancelled' : cls === 'expired' ? 'Overdue' : 'until renewal'}</div>
+    </div>`;
+  return div;
+}
+
+// DETAIL
+function showDetail(id) {
+  currentId = id;
+  const sub = subs.find(s => s.id === id);
+  const cls = getStatusClass(sub);
+  const days = daysUntil(sub.nextDate);
+
+  // Ring
+  const radius = 38, circ = 2 * Math.PI * radius;
+  const progress = cls === 'cancelled' ? 0 : Math.max(0, Math.min(1, days / 90));
+  const offset = circ * (1 - progress);
+  const ringColor = cls === 'expiring' || cls === 'expired' ? '#F59E0B' : cls === 'cancelled' ? '#9CA3AF' : '#4F46E5';
+  const dayLabel = cls === 'cancelled' ? '—' : cls === 'expired' ? Math.abs(days) : days;
+  const unitLabel = cls === 'cancelled' ? '' : cls === 'expired' ? 'days ago' : 'days left';
+
+  document.getElementById('detail-hero').innerHTML = `
+    <div class="detail-icon" style="background:${sub.color}22">${sub.emoji}</div>
+    <div class="detail-name">${sub.name}</div>
+    <div class="detail-price">$${sub.price.toFixed(2)} / month</div>
+    <div class="countdown-ring">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <circle class="ring-bg" cx="50" cy="50" r="${radius}"/>
+        <circle class="ring-fill" cx="50" cy="50" r="${radius}"
+          stroke="${ringColor}"
+          stroke-dasharray="${circ}"
+          stroke-dashoffset="${offset}"/>
+      </svg>
+      <div class="countdown-label">
+        <span class="num">${dayLabel}</span>
+        <span class="unit">${unitLabel}</span>
+      </div>
+    </div>`;
+
+  document.getElementById('detail-rows').innerHTML = `
+    <div class="detail-row"><span class="lbl">Next Charge</span><span class="val">${fmtDate(sub.nextDate)}</span></div>
+    <div class="detail-row"><span class="lbl">Annual Cost</span><span class="val">$${(sub.price * 12).toFixed(2)}</span></div>
+    <div class="detail-row"><span class="lbl">Status</span><span class="val" style="color:${ringColor}">${cls.charAt(0).toUpperCase()+cls.slice(1)}</span></div>`;
+
+  const notice = document.getElementById('cancelled-notice-wrap');
+  notice.innerHTML = cls === 'cancelled' ? `<div class="cancelled-notice">This subscription is cancelled. Renew it to restart the cycle.</div>` : '';
+
+  const btns = document.getElementById('action-btns');
+  btns.innerHTML = cls === 'cancelled'
+    ? `<button class="btn btn-renew" onclick="renewSub()">↺ Reactivate & Renew</button>`
+    : `<button class="btn btn-renew" onclick="renewSub()">✓ Renew — Reset 90-Day Clock</button>
+       <button class="btn btn-cancel" onclick="cancelSub()">✕ Cancel Subscription</button>`;
+
+  show('screen-detail');
+}
+
+function renewSub() {
+  const sub = subs.find(s => s.id === currentId);
+  const next = new Date(); next.setDate(next.getDate() + 90);
+  sub.nextDate = next.toISOString().split('T')[0];
+  sub.status = 'active';
+  saveSubs(); renderDash(); showDetail(currentId);
+  toast('✓ Renewed! Next charge in 90 days.');
+}
+
+function cancelSub() {
+  const sub = subs.find(s => s.id === currentId);
+  sub.status = 'cancelled';
+  saveSubs(); renderDash(); showDetail(currentId);
+  toast('Subscription cancelled.');
+}
+
+// ADD
+function showAdd() {
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-price').value = '';
+  const today = new Date(); today.setDate(today.getDate() + 30);
+  document.getElementById('f-date').value = today.toISOString().split('T')[0];
+  selEmoji = EMOJIS[0]; selColor = COLORS[0];
+  renderEmojiPicker(); renderColorPicker();
+  show('screen-add');
+}
+
+function addSub() {
+  const name = document.getElementById('f-name').value.trim();
+  const price = parseFloat(document.getElementById('f-price').value);
+  const date = document.getElementById('f-date').value;
+  if (!name) { toast('Please enter a name.'); return; }
+  if (isNaN(price) || price < 0) { toast('Enter a valid price.'); return; }
+  if (!date) { toast('Pick a charge date.'); return; }
+  subs.push({ id: uid(), name, price, nextDate: date, emoji: selEmoji, color: selColor, status: 'active' });
+  saveSubs(); renderDash(); showDash();
+  toast(`${name} added!`);
+}
+
+function renderEmojiPicker() {
+  const el = document.getElementById('emoji-picker');
+  el.innerHTML = EMOJIS.map(e =>
+    `<button class="emoji-opt${e===selEmoji?' selected':''}" onclick="selEmoji='${e}';renderEmojiPicker()">${e}</button>`
+  ).join('');
+}
+
+function renderColorPicker() {
+  const el = document.getElementById('color-picker');
+  el.innerHTML = COLORS.map(c =>
+    `<div class="color-opt${c===selColor?' selected':''}" style="background:${c}" onclick="selColor='${c}';renderColorPicker()"></div>`
+  ).join('');
+}
+
+// NAV
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+function showDash() { renderDash(); show('screen-dashboard'); }
+function showAdd() {
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-price').value = '';
+  const today = new Date(); today.setDate(today.getDate() + 30);
+  document.getElementById('f-date').value = today.toISOString().split('T')[0];
+  selEmoji = EMOJIS[0]; selColor = COLORS[0];
+  renderEmojiPicker(); renderColorPicker();
+  show('screen-add');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// INIT
+loadSubs();
+renderDash();
+</script>
+</body>
+</html>
